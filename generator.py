@@ -38,11 +38,7 @@ def loadStructFile():
     #region read strucutre file
     f = None
 
-    if len(sys.argv) > 1:
-        f = open(sys.argv[1],)
-    else:
-        f = open('structure.json',)
-
+    f = open(sys.argv[1],) if len(sys.argv) > 1 else open('structure.json',)
     data = json.load(f)
     f.close()
 
@@ -85,7 +81,7 @@ def loadStructFile():
         http_settings = data['http_settings']
     except KeyError:
         None
-        
+
     try:
         xml_settings = data['xml_settings']
     except KeyError:
@@ -147,23 +143,22 @@ my_server = socketserver.TCPServer(("", PORT), handler_object)
 def executeQuery(sql):
     mycursor = mydb.cursor()
     mycursor.execute(sql)
-    myresult = mycursor.fetchall()
-    return myresult
+    return mycursor.fetchall()
 #endregion
 
 #region generation functions
 
 def convertToFormat(pos, headers, values):
     global mydb
-    
-    if(data['show']):
-        print("(BATCH #" + str(pos) + ") ", end = '')
+
+    if data['show']:
+        print(f"(BATCH #{str(pos)}) ", end = '')
         for _ in range(len(headers)):
-            print(values[_] + ",", end = '')
+            print(f"{values[_]},", end = '')
 
         print('')
 
-    if(data['format'] == "sql"):
+    if (data['format'] == "sql"):
         sql = ("INSERT INTO " + sql_settings['tablename'] + 
         " (" +
             (",".join(headers)) + 
@@ -178,28 +173,26 @@ def convertToFormat(pos, headers, values):
         else:
             writeToFile(sql)
 
-    elif(data['format'] == "csv"):
+    elif (data['format'] == "csv"):
         value = None
 
-        if (pos == 0):
-            value = headers
-        else:
-            value = values
-
+        value = headers if (pos == 0) else values
         writeToFile(
         csv_settings['delimiter'].join(value) + 
         csv_settings['newline']
         )
-    
-    elif(data['format'] == "xml"):
+
+    elif (data['format'] == "xml"):
         writeToFile("   <item>\n")
         for headerIndex in range(len(headers)):
             writeToFile(
-            "       <" + headers[headerIndex] + ">" + values[headerIndex] + "</" + headers[headerIndex] + ">" + 
-            xml_settings['newline']
+                (
+                    f"       <{headers[headerIndex]}>{values[headerIndex]}</{headers[headerIndex]}>"
+                    + xml_settings['newline']
+                )
             )
         writeToFile("   </item>\n")
-        
+
     elif(data['format'] == "json"):
         jsonString = "\n  {\n"
         for headerIndex in range(len(headers)):
@@ -207,7 +200,7 @@ def convertToFormat(pos, headers, values):
             if (headerIndex < (len(headers)-1)):
                 jsonString += ","
             jsonString += "\n"
-        
+
         jsonString += "  }"
         if (pos < (data['quanitity']-1)):
             jsonString += ","
@@ -215,9 +208,8 @@ def convertToFormat(pos, headers, values):
         writeToFile(jsonString)
 
 def writeToFile(value):
-    gen = open('generated.' + data['format'], 'a', encoding="utf8")
-    gen.write(value)
-    gen.close()
+    with open('generated.' + data['format'], 'a', encoding="utf8") as gen:
+        gen.write(value)
 
 #endregion
 
@@ -233,9 +225,8 @@ def generate():
 
     if (path.exists('generated.' + data['format'])):
         print("Cleaning generated data file.........", end = '')
-        gen = open('generated.' + data['format'],'w')
-        gen.write('')
-        gen.close()
+        with open('generated.' + data['format'],'w') as gen:
+            gen.write('')
         print('OK')
 
     #endregion
@@ -257,7 +248,7 @@ def generate():
             valuesFStream = None
             readFromFile = True
             value = 0
-            
+
             if (item['value'] == "integer"):
                 readFromFile = False
                 try:
@@ -265,7 +256,7 @@ def generate():
                         value = int(executeQuery(item['autoIncrementFrom'])[0][0]) + 1
                     else:
                         value = item['autoIncrementFrom'] + _
-                    
+
                 except KeyError:
                     try:
                         xrange = item['range']
@@ -275,8 +266,12 @@ def generate():
                             for rangeIndex in range(len(xrange)-1):
                                 if (isinstance(xrange[rangeIndex], str)):
                                     sql = sql.replace(
-                                        "%" + str(rangeIndex+1),
-                                        str(executeQuery(xrange[rangeIndex+1] + " ORDER BY RAND() LIMIT 1;")[0][0])
+                                        f"%{str(rangeIndex + 1)}",
+                                        str(
+                                            executeQuery(
+                                                f"{xrange[rangeIndex + 1]} ORDER BY RAND() LIMIT 1;"
+                                            )[0][0]
+                                        ),
                                     )
                             sql += " ORDER BY RAND() LIMIT 1;"
                             value = executeQuery(sql)[0][0]
@@ -293,7 +288,7 @@ def generate():
 
             elif (item['value'] == "last_name"):
                 valuesFStream = open('data/last-names.json',)
-            
+
             elif (item['value'] == "places"):
                 valuesFStream = open('data/places.json',)
 
@@ -306,13 +301,13 @@ def generate():
                     print("ERROR: " + item['label'] + " doesen't have range or format attribute")
                     errors += 1
                     value = quote + random_date("1/1/1990 00:00:00", "31/12/2080 00:00:00", '%d/%m/%Y %H:%M:%S', random.random()) + quote
-                
+
             elif (item['value'] == "image"):
                 readFromFile = False
                 xtype = ""
                 width = 200
                 height = 200
-                
+
                 try:
                     xtype = item['type']
                 except KeyError:
@@ -325,12 +320,12 @@ def generate():
                     height = item['height']
                 except KeyError:
                     None
-                
+
                 if (xtype == "human"):
-                    value = quote + "https://storage.terkstudios.com/DataGenerator/Humans/" + str(random.randrange(1,375)).zfill(7) + ".png" + quote
+                    value = f"{quote}https://storage.terkstudios.com/DataGenerator/Humans/{str(random.randrange(1, 375)).zfill(7)}.png{quote}"
                 else:
-                    value = quote + "https://picsum.photos/" + str(width) + "/" + str(height) +"?random=1" + quote
-                
+                    value = f"{quote}https://picsum.photos/{str(width)}/{str(height)}?random=1{quote}"
+
             elif (item['value'] == "emoji"):
                 valuesFStream = open('data/emojis.json', encoding="utf8")
 
@@ -343,10 +338,10 @@ def generate():
                     leng = item['length']
                 except KeyError:
                     None
-                
+
                 for __ in range(leng):
                     value += valuesArray[random.randrange(0,len(valuesArray))]
-                
+
                 value += quote
                 valuesFStream.close()
 
@@ -362,7 +357,7 @@ def generate():
 
     if(data['show'] == False):
         bar.finish()
-    
+
     print("Script ended, information generated (" + str(data['quanitity']) + " rows) with " + str(errors) + " errors.\n")
     errors = 0
 
